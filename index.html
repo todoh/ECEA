@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Juego de Cartas - CS</title>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎴</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="styless.css">
 
-    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap)" rel="stylesheet">
-    <link rel="stylesheet" href="styless.css"> <script src="[https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js](https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js)"></script>
-    <script src="[https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js](https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js)"></script>
-    <script src="[https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js](https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js)"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -23,270 +23,187 @@
         <div class="input-group">
             <label for="rivalNameScreen1">Introduce el nombre de tu rival:</label>
             <input type="text" id="rivalNameScreen1" placeholder="Nombre del rival">
-            <div id="nameError" class="error-message"></div>
         </div>
+        <p id="nameError" class="error-message"></p>
+        <p id="rivalErrorScreen1" class="error-message"></p>
     </div>
 
     <div id="screen2" class="game-screen">
-        <h2>Esperando Rival...</h2>
-        <p>Tu nombre: <span id="playerNameScreen2"></span></p>
-        <p>Rival: <span id="rivalNameScreen2"></span></p>
-        <p>ID de Sala: <span id="roomIdDisplay"></span></p>
-        <p id="waitingMessage">Esperando a que el rival se conecte...</p>
-        <button id="btnStartGame" style="display: none;">¡Empezar Partida!</button>
-        <button id="btnCancelGame">Cancelar Partida</button>
+        <h1 id="gameOverTitle">¡Partida Terminada!</h1>
+        <p id="winnerDisplay"></p>
+        <p id="playerNamesDisplay"></p>
+
+        <div class="input-group">
+            <label for="playerNameScreen2">Tu nombre:</label>
+            <input type="text" id="playerNameScreen2" readonly>
+        </div>
+        <div class="input-group">
+            <label for="rivalNameScreen2">Nombre del rival:</label>
+            <input type="text" id="rivalNameScreen2" readonly>
+        </div>
+        <button id="btnRematch">REINICIAR PARTIDA CONTRA EL MISMO JUGADOR</button>
+        <div id="btnRematchStatusIndicator"></div>
     </div>
 
     <div id="screen3" class="game-screen">
-        <div class="game-header">
-            <div class="player-info">
-                <span id="ownNameDisplay"></span> (Tú) - Posición: <span id="ownPositionDisplay">0</span>
-            </div>
-            <div class="player-info">
-                <span id="opponentNameDisplay"></span> (Rival) - Posición: <span id="opponentPositionDisplay">0</span>
-            </div>
-            <div class="turn-info">
-                Turno de: <span id="currentTurnDisplay"></span>
+        <div class="player-area opponent-area">
+            <span id="opponentNameDisplay">Rival</span>
+            <div id="opponentActiveEffects" class="active-effects-container"></div>
+            <div class="hand opponent-hand" id="opponentHand">
             </div>
         </div>
 
-        <div id="gameBoard" class="game-board">
-            </div>
-
-        <div class="player-tokens">
-            <div id="player1Token" class="player-token player1"></div>
-            <div id="player2Token" class="player-token player2"></div>
+        <div class="game-central-layout">
+            <div class="deck" id="deck">Mazo</div>
+            <div class="board-area" id="gameBoard"></div>
+            <div class="discard-pile" id="discardPile">Descarte</div>
         </div>
 
-        <div id="gameMessages" class="game-messages"></div>
-
-        <div class="player-hands">
-            <div class="hand opponent-hand">
-                <h3>Mano del Rival (<span id="opponentHandCount">0</span> cartas)</h3>
-                <div id="opponentHand" class="card-container">
-                    </div>
+        <div class="player-area own-area">
+            <div class="own-info-bar">
+                <span id="ownNameDisplay">Tú</span>
             </div>
-            <div class="hand own-hand">
-                <h3>Tu Mano (<span id="ownHandCount">0</span> cartas)</h3>
-                <div id="ownHand" class="card-container">
-                    </div>
+            <div id="ownActiveEffects" class="active-effects-container"></div>
+            <button id="btnPassTurn" class="game-button">Pasar Turno</button>
+            <div class="hand own-hand" id="ownHand">
             </div>
-        </div>
-
-        <div class="game-controls">
-            <button id="btnPlayCard">Jugar Carta</button>
-            <button id="btnPassTurn">Pasar Turno</button>
-            <button id="btnRematch" style="display: none;">Revancha</button>
-            <button id="btnNewGame" style="display: none;">Nueva Partida</button>
-        </div>
-
-        <div id="cardInteractionModal" class="modal">
-            <div class="modal-content">
-                <h2 id="modalTitle"></h2>
-                <div id="modalBody"></div>
-                <div id="modalButtons" class="modal-buttons"></div>
-            </div>
-        </div>
-
-        <div id="gameOverModal" class="modal">
-            <div class="modal-content">
-                <h2 id="gameOverTitle"></h2>
-                <p>Ganador: <span id="winnerDisplay"></span></p>
-                <p>Jugadores: <span id="playerNamesDisplay"></span></p>
-                <div class="modal-buttons">
-                    <button id="btnRematchGameOver">Revancha</button>
-                    <button id="btnNewGameGameOver">Nueva Partida</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="ownActiveEffects" class="active-effects-display"></div>
-        <div id="opponentActiveEffects" class="active-effects-display"></div>
+        <p id="gameMessage" class="game-message"></p>
     </div>
 
-    <script src="constantes.js"></script> <script src="cons.js"></script>      <script src="online.js"></script>    <script src="funciones.js"></script> <script src="funcionescartas.js"></script> <script src="dibujar.js"></script>   <script>
-        // Configuración de Firebase (debe ser accesible globalmente para FirebaseService)
-        const firebaseConfig = {
-            apiKey: "AIzaSyAfK_AOq-Pc2bzgXEzIEZ1ESWvnhMJUvwI",
-            authDomain: "enraya-51670.firebaseapp.com",
-            databaseURL: "[https://enraya-51670-default-rtdb.europe-west1.firebasedatabase.app](https://enraya-51670-default-rtdb.europe-west1.firebasedatabase.app)",
-            projectId: "enraya-51670",
-            storageBucket: "enraya-51670.appspot.com",
-            messagingSenderId: "103343380727",
-            appId: "1:103343380727:web:b2fa02aee03c9506915bf2",
-            measurementId: "G-2G31LLJY1T"
-        };
+    <div id="cardInteractionModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="modalTitle"></h2>
+            <div id="modalBody" class="modal-body"></div>
+            <div id="modalButtons" class="modal-buttons"></div>
+        </div>
+    </div>
+    
+    
+<script src="cons.js"></script>
+    <script src="imagenes.js"></script>
+<script src="constantes.js"></script>
+<script src="dibujar.js"></script>
 
-        // Inicializar Firebase (solo una vez)
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+<script src="online.js"></script> 
+<script src="funcionescartas.js"></script>
 
-        // Inicializar los "módulos" globales
-        // UIManager ya se inicializa en cons.js al cargar el script
-        // FirebaseService ya se inicializa en online.js al cargar el script
-        // GameLogic ya se inicializa en funciones.js al cargar el script
+<script src="funciones.js"></script>
 
-        // Asegurarse de que los módulos tienen acceso a Firebase y entre sí
-        window.FirebaseService.init(auth, db);
-        window.GameLogic.init(window.FirebaseService, window.UIManager, window.cardDefinitions, window.cardEffects);
-        window.UIManager.init(window.GameLogic); // UIManager necesita GameLogic para algunos eventos
+ 
+    <script>
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Referencias a los elementos de las pantallas (ahora gestionadas por UIManager)
-            const playerNameInput = UIManager.playerNameInput;
-            const rivalNameInputScreen1 = UIManager.rivalNameInputScreen1;
-            const btnEnterName = UIManager.btnEnterName;
-            const btnStartGame = UIManager.btnStartGame;
-            const btnCancelGame = UIManager.btnCancelGame;
-            const btnPlayCard = UIManager.btnPlayCard;
-            const btnPassTurn = UIManager.btnPassTurn;
-            const btnRematch = UIManager.btnRematch;
-            const btnNewGame = UIManager.btnNewGame;
-            const btnRematchGameOver = UIManager.btnRematchGameOver;
-            const btnNewGameGameOver = UIManager.btnNewGameGameOver;
 
-            UIManager.showScreen(UIManager.screen1); // Mostrar la primera pantalla al inicio
+        // --- Event Listeners ---
 
-            // --- Event Listeners ---
-            btnEnterName.addEventListener('click', async () => {
-                const playerName = playerNameInput.value.trim();
-                const rivalName = rivalNameInputScreen1.value.trim();
+        // Lógica para la Pantalla 1: Introducir Nombre de Jugador
+        btnEnterName.addEventListener('click', async () => {
+            const name = playerNameInput.value.trim();
+            const rival = rivalNameInputScreen1.value.trim();
 
-                if (!playerName || !rivalName) {
-                    UIManager.nameError.textContent = 'Por favor, introduce ambos nombres.';
-                    return;
+            nameError.textContent = '';
+            rivalErrorScreen1.textContent = '';
+
+            let valid = true;
+            if (!name) {
+                nameError.textContent = 'Por favor, introduce tu nombre.';
+                valid = false;
+            }
+
+            if (!rival) {
+                rivalErrorScreen1.textContent = 'Por favor, introduce el nombre de tu rival.';
+                valid = false;
+            } else if (name && rival === name) {
+                rivalErrorScreen1.textContent = 'No puedes ser tu propio rival. Introduce un nombre diferente.';
+                valid = false;
+            }
+
+            if (valid) {
+                currentPlayerName = name;
+                rivalPlayerName = rival;
+                console.log(`Tu nombre: ${currentPlayerName}, Nombre del rival: ${rivalPlayerName}`);
+
+                await signInAnonymouslyAndGetUid();
+                if (currentUserId) {
+                    await findOrCreateRoom(currentPlayerName, rivalPlayerName);
+                    // showScreen(screen3) es manejado por findOrCreateRoom o listenToRoomChanges
+                } else {
+                    nameError.textContent = 'Error de autenticación. Por favor, recarga la página.';
                 }
-                if (playerName === rivalName) {
-                    UIManager.nameError.textContent = 'Tu nombre no puede ser igual al de tu rival.';
-                    return;
-                }
-                UIManager.nameError.textContent = ''; // Limpiar errores
-
-                UIManager.showLoading('Iniciando sesión y buscando sala...');
-                try {
-                    await FirebaseService.signInAnonymouslyAndGetUid();
-                    await FirebaseService.findOrCreateRoom(playerName, rivalName);
-                    // Una vez que la sala se encuentra/crea, el listener de FirebaseService.listenToRoomChanges
-                    // se encargará de actualizar el estado del juego y la UI.
-                } catch (error) {
-                    console.error("Error en el inicio de juego:", error);
-                    UIManager.showError(`Error al iniciar el juego: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
-
-            btnStartGame.addEventListener('click', async () => {
-                UIManager.showLoading('Iniciando partida...');
-                try {
-                    await GameLogic.startGame();
-                } catch (error) {
-                    console.error("Error al iniciar la partida:", error);
-                    UIManager.showError(`Error al iniciar la partida: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
-
-            btnCancelGame.addEventListener('click', async () => {
-                UIManager.showLoading('Cancelando partida...');
-                try {
-                    await FirebaseService.cancelGame();
-                    UIManager.showScreen(UIManager.screen1);
-                    UIManager.showGameMessage('Partida cancelada. Puedes empezar una nueva.');
-                } catch (error) {
-                    console.error("Error al cancelar la partida:", error);
-                    UIManager.showError(`Error al cancelar la partida: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
-
-            btnPlayCard.addEventListener('click', async () => {
-                // Deshabilitar el botón para evitar clics múltiples
-                btnPlayCard.disabled = true;
-                UIManager.showLoading('Seleccionando carta...');
-                try {
-                    await GameLogic.playCard();
-                } catch (error) {
-                    console.error("Error al jugar carta:", error);
-                    UIManager.showError(`Error al jugar carta: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                    btnPlayCard.disabled = false; // Habilitar de nuevo
-                }
-            });
-
-            btnPassTurn.addEventListener('click', async () => {
-                // Deshabilitar el botón para evitar clics múltiples
-                btnPassTurn.disabled = true;
-                UIManager.showLoading('Pasando turno...');
-                try {
-                    await GameLogic.passTurn();
-                } catch (error) {
-                    console.error("Error al pasar turno:", error);
-                    UIManager.showError(`Error al pasar turno: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                    btnPassTurn.disabled = false; // Habilitar de nuevo
-                }
-            });
-
-            btnRematch.addEventListener('click', async () => {
-                UIManager.showLoading('Solicitando revancha...');
-                try {
-                    await GameLogic.requestRematch();
-                } catch (error) {
-                    console.error("Error al solicitar revancha:", error);
-                    UIManager.showError(`Error al solicitar revancha: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
-
-            btnNewGame.addEventListener('click', async () => {
-                UIManager.showLoading('Iniciando nueva partida...');
-                try {
-                    await GameLogic.resetGame();
-                    UIManager.showScreen(UIManager.screen1);
-                    UIManager.showGameMessage('Nueva partida iniciada.');
-                } catch (error) {
-                    console.error("Error al iniciar nueva partida:", error);
-                    UIManager.showError(`Error al iniciar nueva partida: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
-
-            btnRematchGameOver.addEventListener('click', async () => {
-                UIManager.hideModal('gameOverModal');
-                UIManager.showLoading('Solicitando revancha...');
-                try {
-                    await GameLogic.requestRematch();
-                } catch (error) {
-                    console.error("Error al solicitar revancha:", error);
-                    UIManager.showError(`Error al solicitar revancha: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
-
-            btnNewGameGameOver.addEventListener('click', async () => {
-                UIManager.hideModal('gameOverModal');
-                UIManager.showLoading('Iniciando nueva partida...');
-                try {
-                    await GameLogic.resetGame();
-                    UIManager.showScreen(UIManager.screen1);
-                    UIManager.showGameMessage('Nueva partida iniciada.');
-                } catch (error) {
-                    console.error("Error al iniciar nueva partida:", error);
-                    UIManager.showError(`Error al iniciar nueva partida: ${error.message}`);
-                } finally {
-                    UIManager.hideLoading();
-                }
-            });
+            }
         });
+
+
+        btnPassTurn.addEventListener('click', passTurn);
+
+        // Event listener para el botón de reinicio en screen2
+        btnRematch.addEventListener('click', async () => {
+            if (!currentRoomId || !currentUserId) {
+                console.error("No hay sala o usuario actual para iniciar el reinicio.");
+                return;
+            }
+
+            const roomRef = db.collection('SALAS').doc(currentRoomId);
+            try {
+                // Actualizar el estado de rematch para el jugador actual
+                await roomRef.update({
+                    [`estadoJuego.rematchStatus.${currentUserId}`]: true
+                });
+                console.log(`DEBUG: Jugador ${currentUserId} ha marcado como listo para revancha.`);
+                // La UI se actualizará vía el onSnapshot listener
+            } catch (error) {
+                console.error("Error al actualizar estado de revancha:", error);
+            }
+        });
+
+        // Inicialmente, mostrar la primera pantalla
+        showScreen(screen1);
+
+        // Ajustar el tablero cuando la ventana cambia de tamaño
+        window.addEventListener('resize', () => {
+            if (screen3.classList.contains('active')) {
+                // Solo renderizar si la pantalla de juego está activa
+                // Necesitamos los valores actuales de posición para re-renderizar
+                // Esto requerirá que el estado del juego sea accesible globalmente o se pase
+                // Por ahora, solo se re-renderiza con valores por defecto si no hay estado
+                // Esta llamada debería idealmente usar el estado actual del juego
+                // Para simplificar, asumimos que el updateGameUI se encargará de esto con el onSnapshot
+            }
+        });
+
+        // Asegurarse de que el tablero se renderice correctamente al cargar la pantalla 3
+        // Esto se ejecutará una vez que la pantalla 3 sea activa
+        const observer = new MutationObserver((mutationsList, observer) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (screen3.classList.contains('active')) {
+                        // Dar un pequeño retraso para asegurar que el DOM esté listo y los tamaños calculados
+                        // Se llama a renderGameBoard con 0,0 aquí, pero el onSnapshot lo actualizará con los valores reales
+                        setTimeout(() => {
+                            // Si ya hay un roomData disponible, usarlo. Si no, 0,0 es un buen inicio.
+                            if (currentRoomId) {
+                                db.collection('SALAS').doc(currentRoomId).get().then(doc => {
+                                    if (doc.exists) {
+                                        const roomData = doc.data();
+                                        const ownPos = roomData.jugador1Id === currentUserId ? roomData.estadoJuego.posicionJugador1 : roomData.estadoJuego.posicionJugador2;
+                                        const opponentPos = roomData.jugador1Id === currentUserId ? roomData.estadoJuego.posicionJugador2 : roomData.estadoJuego.posicionJugador1;
+                                        renderGameBoard(ownPos, opponentPos);
+                                    } else {
+                                        renderGameBoard(0, 0);
+                                    }
+                                }).catch(error => {
+                                    console.error("Error al obtener datos de la sala para renderizar tablero:", error);
+                                    renderGameBoard(0, 0);
+                                });
+                            } else {
+                                renderGameBoard(0, 0);
+                            }
+                        }, 100);
+                    }
+                }
+            }
+        });
+        observer.observe(screen3, { attributes: true });
+
     </script>
 </body>
 </html>
