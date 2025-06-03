@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Cartas - CS</title>
+    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap)" rel="stylesheet">
+    <link rel="stylesheet" href="styless.css"> <script src="[https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js](https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js)"></script>
+    <script src="[https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js](https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js)"></script>
+    <script src="[https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js](https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js)"></script>
+</head>
+<body>
+
+    <div id="screen1" class="game-screen active">
+        <h1>¡Bienvenido a CS Cards!</h1>
+        <div class="input-group">
+            <label for="playerName">Introduce tu nombre:</label>
+            <input type="text" id="playerName" placeholder="Tu nombre">
+            <button id="btnEnterName">Aceptar</button>
+        </div>
+        <div class="input-group">
+            <label for="rivalNameScreen1">Introduce el nombre de tu rival:</label>
+            <input type="text" id="rivalNameScreen1" placeholder="Nombre del rival">
+            <div id="nameError" class="error-message"></div>
+        </div>
+    </div>
+
+    <div id="screen2" class="game-screen">
+        <h2>Esperando Rival...</h2>
+        <p>Tu nombre: <span id="playerNameScreen2"></span></p>
+        <p>Rival: <span id="rivalNameScreen2"></span></p>
+        <p>ID de Sala: <span id="roomIdDisplay"></span></p>
+        <p id="waitingMessage">Esperando a que el rival se conecte...</p>
+        <button id="btnStartGame" style="display: none;">¡Empezar Partida!</button>
+        <button id="btnCancelGame">Cancelar Partida</button>
+    </div>
+
+    <div id="screen3" class="game-screen">
+        <div class="game-header">
+            <div class="player-info">
+                <span id="ownNameDisplay"></span> (Tú) - Posición: <span id="ownPositionDisplay">0</span>
+            </div>
+            <div class="player-info">
+                <span id="opponentNameDisplay"></span> (Rival) - Posición: <span id="opponentPositionDisplay">0</span>
+            </div>
+            <div class="turn-info">
+                Turno de: <span id="currentTurnDisplay"></span>
+            </div>
+        </div>
+
+        <div id="gameBoard" class="game-board">
+            </div>
+
+        <div class="player-tokens">
+            <div id="player1Token" class="player-token player1"></div>
+            <div id="player2Token" class="player-token player2"></div>
+        </div>
+
+        <div id="gameMessages" class="game-messages"></div>
+
+        <div class="player-hands">
+            <div class="hand opponent-hand">
+                <h3>Mano del Rival (<span id="opponentHandCount">0</span> cartas)</h3>
+                <div id="opponentHand" class="card-container">
+                    </div>
+            </div>
+            <div class="hand own-hand">
+                <h3>Tu Mano (<span id="ownHandCount">0</span> cartas)</h3>
+                <div id="ownHand" class="card-container">
+                    </div>
+            </div>
+        </div>
+
+        <div class="game-controls">
+            <button id="btnPlayCard">Jugar Carta</button>
+            <button id="btnPassTurn">Pasar Turno</button>
+            <button id="btnRematch" style="display: none;">Revancha</button>
+            <button id="btnNewGame" style="display: none;">Nueva Partida</button>
+        </div>
+
+        <div id="cardInteractionModal" class="modal">
+            <div class="modal-content">
+                <h2 id="modalTitle"></h2>
+                <div id="modalBody"></div>
+                <div id="modalButtons" class="modal-buttons"></div>
+            </div>
+        </div>
+
+        <div id="gameOverModal" class="modal">
+            <div class="modal-content">
+                <h2 id="gameOverTitle"></h2>
+                <p>Ganador: <span id="winnerDisplay"></span></p>
+                <p>Jugadores: <span id="playerNamesDisplay"></span></p>
+                <div class="modal-buttons">
+                    <button id="btnRematchGameOver">Revancha</button>
+                    <button id="btnNewGameGameOver">Nueva Partida</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="ownActiveEffects" class="active-effects-display"></div>
+        <div id="opponentActiveEffects" class="active-effects-display"></div>
+    </div>
+
+    <script src="constantes.js"></script> <script src="cons.js"></script>      <script src="online.js"></script>    <script src="funciones.js"></script> <script src="funcionescartas.js"></script> <script src="dibujar.js"></script>   <script>
+        // Configuración de Firebase (debe ser accesible globalmente para FirebaseService)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAfK_AOq-Pc2bzgXEzIEZ1ESWvnhMJUvwI",
+            authDomain: "enraya-51670.firebaseapp.com",
+            databaseURL: "[https://enraya-51670-default-rtdb.europe-west1.firebasedatabase.app](https://enraya-51670-default-rtdb.europe-west1.firebasedatabase.app)",
+            projectId: "enraya-51670",
+            storageBucket: "enraya-51670.appspot.com",
+            messagingSenderId: "103343380727",
+            appId: "1:103343380727:web:b2fa02aee03c9506915bf2",
+            measurementId: "G-2G31LLJY1T"
+        };
+
+        // Inicializar Firebase (solo una vez)
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Inicializar los "módulos" globales
+        // UIManager ya se inicializa en cons.js al cargar el script
+        // FirebaseService ya se inicializa en online.js al cargar el script
+        // GameLogic ya se inicializa en funciones.js al cargar el script
+
+        // Asegurarse de que los módulos tienen acceso a Firebase y entre sí
+        window.FirebaseService.init(auth, db);
+        window.GameLogic.init(window.FirebaseService, window.UIManager, window.cardDefinitions, window.cardEffects);
+        window.UIManager.init(window.GameLogic); // UIManager necesita GameLogic para algunos eventos
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Referencias a los elementos de las pantallas (ahora gestionadas por UIManager)
+            const playerNameInput = UIManager.playerNameInput;
+            const rivalNameInputScreen1 = UIManager.rivalNameInputScreen1;
+            const btnEnterName = UIManager.btnEnterName;
+            const btnStartGame = UIManager.btnStartGame;
+            const btnCancelGame = UIManager.btnCancelGame;
+            const btnPlayCard = UIManager.btnPlayCard;
+            const btnPassTurn = UIManager.btnPassTurn;
+            const btnRematch = UIManager.btnRematch;
+            const btnNewGame = UIManager.btnNewGame;
+            const btnRematchGameOver = UIManager.btnRematchGameOver;
+            const btnNewGameGameOver = UIManager.btnNewGameGameOver;
+
+            UIManager.showScreen(UIManager.screen1); // Mostrar la primera pantalla al inicio
+
+            // --- Event Listeners ---
+            btnEnterName.addEventListener('click', async () => {
+                const playerName = playerNameInput.value.trim();
+                const rivalName = rivalNameInputScreen1.value.trim();
+
+                if (!playerName || !rivalName) {
+                    UIManager.nameError.textContent = 'Por favor, introduce ambos nombres.';
+                    return;
+                }
+                if (playerName === rivalName) {
+                    UIManager.nameError.textContent = 'Tu nombre no puede ser igual al de tu rival.';
+                    return;
+                }
+                UIManager.nameError.textContent = ''; // Limpiar errores
+
+                UIManager.showLoading('Iniciando sesión y buscando sala...');
+                try {
+                    await FirebaseService.signInAnonymouslyAndGetUid();
+                    await FirebaseService.findOrCreateRoom(playerName, rivalName);
+                    // Una vez que la sala se encuentra/crea, el listener de FirebaseService.listenToRoomChanges
+                    // se encargará de actualizar el estado del juego y la UI.
+                } catch (error) {
+                    console.error("Error en el inicio de juego:", error);
+                    UIManager.showError(`Error al iniciar el juego: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+
+            btnStartGame.addEventListener('click', async () => {
+                UIManager.showLoading('Iniciando partida...');
+                try {
+                    await GameLogic.startGame();
+                } catch (error) {
+                    console.error("Error al iniciar la partida:", error);
+                    UIManager.showError(`Error al iniciar la partida: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+
+            btnCancelGame.addEventListener('click', async () => {
+                UIManager.showLoading('Cancelando partida...');
+                try {
+                    await FirebaseService.cancelGame();
+                    UIManager.showScreen(UIManager.screen1);
+                    UIManager.showGameMessage('Partida cancelada. Puedes empezar una nueva.');
+                } catch (error) {
+                    console.error("Error al cancelar la partida:", error);
+                    UIManager.showError(`Error al cancelar la partida: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+
+            btnPlayCard.addEventListener('click', async () => {
+                // Deshabilitar el botón para evitar clics múltiples
+                btnPlayCard.disabled = true;
+                UIManager.showLoading('Seleccionando carta...');
+                try {
+                    await GameLogic.playCard();
+                } catch (error) {
+                    console.error("Error al jugar carta:", error);
+                    UIManager.showError(`Error al jugar carta: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                    btnPlayCard.disabled = false; // Habilitar de nuevo
+                }
+            });
+
+            btnPassTurn.addEventListener('click', async () => {
+                // Deshabilitar el botón para evitar clics múltiples
+                btnPassTurn.disabled = true;
+                UIManager.showLoading('Pasando turno...');
+                try {
+                    await GameLogic.passTurn();
+                } catch (error) {
+                    console.error("Error al pasar turno:", error);
+                    UIManager.showError(`Error al pasar turno: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                    btnPassTurn.disabled = false; // Habilitar de nuevo
+                }
+            });
+
+            btnRematch.addEventListener('click', async () => {
+                UIManager.showLoading('Solicitando revancha...');
+                try {
+                    await GameLogic.requestRematch();
+                } catch (error) {
+                    console.error("Error al solicitar revancha:", error);
+                    UIManager.showError(`Error al solicitar revancha: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+
+            btnNewGame.addEventListener('click', async () => {
+                UIManager.showLoading('Iniciando nueva partida...');
+                try {
+                    await GameLogic.resetGame();
+                    UIManager.showScreen(UIManager.screen1);
+                    UIManager.showGameMessage('Nueva partida iniciada.');
+                } catch (error) {
+                    console.error("Error al iniciar nueva partida:", error);
+                    UIManager.showError(`Error al iniciar nueva partida: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+
+            btnRematchGameOver.addEventListener('click', async () => {
+                UIManager.hideModal('gameOverModal');
+                UIManager.showLoading('Solicitando revancha...');
+                try {
+                    await GameLogic.requestRematch();
+                } catch (error) {
+                    console.error("Error al solicitar revancha:", error);
+                    UIManager.showError(`Error al solicitar revancha: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+
+            btnNewGameGameOver.addEventListener('click', async () => {
+                UIManager.hideModal('gameOverModal');
+                UIManager.showLoading('Iniciando nueva partida...');
+                try {
+                    await GameLogic.resetGame();
+                    UIManager.showScreen(UIManager.screen1);
+                    UIManager.showGameMessage('Nueva partida iniciada.');
+                } catch (error) {
+                    console.error("Error al iniciar nueva partida:", error);
+                    UIManager.showError(`Error al iniciar nueva partida: ${error.message}`);
+                } finally {
+                    UIManager.hideLoading();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
