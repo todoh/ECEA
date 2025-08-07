@@ -575,12 +575,12 @@ async function effectNini(state) {
 }
 
 async function effectInfluencer(state) {
-    let { ownHand, rivalHand, ownPos, rivalPos, currentUserId, currentRivalId, roomData, roomRef, effectsActivos, pilaDescarte } = state; 
+    let { ownHand, rivalHand, ownPos, rivalPos, currentUserId, currentRivalId, roomData, roomRef, effectsActivos, pilaDescarte } = state;
     const isPlayer1 = roomData.jugador1Id === currentUserId;
     console.log("DEBUG: Efecto Influencer activado.");
 
     const targetPlayerIdInfluencer = await choosePlayer();
-    
+
     if (isEffectBlockedByGuardaespaldas(targetPlayerIdInfluencer, effectsActivos)) {
         gameMessageDiv.textContent = `${opponentNameDisplay.textContent} está protegido por Guardaespaldas. ¡El efecto Influencer es bloqueado!`;
         console.log("DEBUG: Influencer: Efecto bloqueado por Guardaespaldas.");
@@ -588,7 +588,7 @@ async function effectInfluencer(state) {
     }
 
     // Use the current state hands directly, do not re-fetch
-    if (ownHand.length === 0 || rivalHand.length === 0) { 
+    if (ownHand.length === 0 || rivalHand.length === 0) {
         gameMessageDiv.textContent = 'Uno de los jugadores no tiene cartas para el efecto Influencer.';
         console.log("DEBUG: Influencer: Jugador sin cartas.");
         return;
@@ -598,12 +598,12 @@ async function effectInfluencer(state) {
     const ownHighestCardInitial = ownHand.reduce((maxCard, cardId) => {
         const card = cardDefinitions.find(c => c.id === cardId);
         return (!maxCard || (card && card.value > maxCard.value)) ? card : maxCard;
-    }, {value: -Infinity});
+    }, { value: -Infinity });
 
     const rivalHighestCardInitial = rivalHand.reduce((maxCard, cardId) => {
         const card = cardDefinitions.find(c => c.id === cardId);
         return (!maxCard || (card && card.value > maxCard.value)) ? card : maxCard;
-    }, {value: -Infinity});
+    }, { value: -Infinity });
 
     if (ownHighestCardInitial.value !== -Infinity && rivalHighestCardInitial.value !== -Infinity) {
         const modalIdInfluencer = `influencer-${Date.now()}-${currentUserId}`;
@@ -656,12 +656,12 @@ async function effectInfluencer(state) {
         const freshOwnHighestCard = ownHand.reduce((maxCard, cardId) => {
             const card = cardDefinitions.find(c => c.id === cardId);
             return (!maxCard || (card && card.value > maxCard.value)) ? card : maxCard;
-        }, {value: -Infinity});
+        }, { value: -Infinity });
 
         const freshRivalHighestCard = rivalHand.reduce((maxCard, cardId) => {
             const card = cardDefinitions.find(c => c.id === cardId);
             return (!maxCard || (card && card.value > maxCard.value)) ? card : maxCard;
-        }, {value: -Infinity});
+        }, { value: -Infinity });
 
         gameMessageDiv.textContent = `Comparando cartas más altas: Tú ${freshOwnHighestCard.name}, Rival ${freshRivalHighestCard.name}.`;
         console.log("DEBUG: Influencer: Cartas más altas (post-modal) - Propia:", freshOwnHighestCard.name, "Rival:", freshRivalHighestCard.name);
@@ -679,20 +679,6 @@ async function effectInfluencer(state) {
         } else {
             gameMessageDiv.textContent += ` Empate. Nadie avanza ni retrocede.`;
             console.log("DEBUG: Influencer: Empate.");
-        }
-
-        // Discard both compared cards
-        const indexOwnHighest = ownHand.indexOf(freshOwnHighestCard.id);
-        if (indexOwnHighest > -1) {
-            ownHand.splice(indexOwnHighest, 1);
-            pilaDescarte.push(freshOwnHighestCard.id);
-            console.log(`DEBUG: Influencer: Descartada carta propia: ${freshOwnHighestCard.name}`);
-        }
-        const indexRivalHighest = rivalHand.indexOf(freshRivalHighestCard.id);
-        if (indexRivalHighest > -1) {
-            rivalHand.splice(indexRivalHighest, 1);
-            pilaDescarte.push(freshRivalHighestCard.id);
-            console.log(`DEBUG: Influencer: Descartada carta rival: ${freshRivalHighestCard.name}`);
         }
 
     } else {
