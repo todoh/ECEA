@@ -987,7 +987,11 @@ async function effectSectario(state) {
     console.log("DEBUG: Efecto Sectario activado.");
 
     const targetPlayerIdSectario = await choosePlayer();
-    let targetHandSectario = (isPlayer1 && targetPlayerIdSectario === currentRivalId) ? rivalHand : ownHand;
+
+    // --- CORRECCIÓN ---
+    // La línea original fue reemplazada por una más simple y correcta.
+    // let targetHandSectario = (isPlayer1 && targetPlayerIdSectario === currentRivalId) ? rivalHand : ownHand; // <-- LÍNEA INCORRECTA ELIMINADA
+    let targetHandSectario = rivalHand; // <-- NUEVA LÍNEA CORRECTA
 
     const modalIdSectario = `sectario-${Date.now()}-${currentUserId}`;
 
@@ -1015,7 +1019,6 @@ async function effectSectario(state) {
         rivalHandDisplayDivSectario.textContent = 'El rival no tiene cartas en la mano.';
     }
 
-    console.log("DEBUG: Sectario - Displaying modal for current player.");
     const exchangeDecision = await displayModal(
         'Cartas del Rival (Sectario)',
         rivalHandDisplayDivSectario,
@@ -1025,18 +1028,13 @@ async function effectSectario(state) {
         ],
         'view-hand-modal'
     );
-    console.log("DEBUG: Sectario - exchangeDecision:", exchangeDecision);
 
     await roomRef.update({
         [`estadoJuego.modalConfirmations.${modalIdSectario}.${currentUserId}`]: true
     });
-    console.log("DEBUG: Sectario - Current player confirmation updated in Firestore.");
 
-    console.log("DEBUG: Sectario - Awaiting multi-player confirmation...");
     await awaitMultiPlayerModalConfirmation(modalIdSectario);
-    console.log("DEBUG: Sectario - Multi-player confirmation complete.");
 
-    console.log("DEBUG: Sectario - Attempting exchange logic.");
     if (exchangeDecision === 'exchange') {
         if (targetPlayerIdSectario !== currentUserId) {
             const tempHand = [...ownHand];
@@ -1048,15 +1046,16 @@ async function effectSectario(state) {
             console.log("DEBUG: Sectario: Manos intercambiadas.");
         } else {
             gameMessageDiv.textContent = 'No puedes intercambiar contigo mismo.';
-            console.log("DEBUG: Sectario: Intento de intercambio consigo mismo.");
         }
     } else {
         gameMessageDiv.textContent = 'Has decidido no intercambiar cartas.';
-        console.log("DEBUG: Sectario: No se intercambiaron cartas.");
     }
 
     state.ownPos = Math.min(13, ownPos + 1);
-    if (isPlayer1 && targetPlayerIdSectario === currentRivalId) { state.rivalHand = targetHandSectario; } else if (targetPlayerIdSectario === currentUserId) { state.ownHand = targetHandSectario; }
+
+    // --- CORRECCIÓN ---
+    // Se elimina esta línea final porque ya no es necesaria y podía causar errores.
+    // if (isPlayer1 && targetPlayerIdSectario === currentRivalId) { state.rivalHand = targetHandSectario; } else if (targetPlayerIdSectario === currentUserId) { state.ownHand = targetHandSectario; }
 }
 
 async function effectAstronauta(state) {
