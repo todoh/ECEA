@@ -40,87 +40,91 @@ const isEffectBlockedByGuardaespaldas = (targetPlayerId, effectsActivos) => {
 
 // --- Funciones de efecto individuales para cada carta ---
 
+// En el archivo: funcionescartas.js
+
 async function effectMuerte(state) {
-    let { ownPos, rivalHand, pilaDescarte, currentUserId, currentRivalId, roomData, roomRef, effectsActivos } = state;
-    console.log("DEBUG: Efecto Muerte activado.");
+    // Se envuelve toda la lógica en un try...catch para encontrar errores ocultos
+    try {
+        let { ownPos, rivalHand, pilaDescarte, currentUserId, currentRivalId, roomData, roomRef, effectsActivos } = state;
+        console.log("DEBUG: Efecto Muerte activado.");
 
-    if (isEffectBlockedByGuardaespaldas(currentRivalId, effectsActivos)) {
-        gameMessageDiv.textContent = `${opponentNameDisplay.textContent} está protegido por Guardaespaldas. ¡El efecto Muerte es bloqueado!`;
-        return;
-    }
+        if (isEffectBlockedByGuardaespaldas(currentRivalId, effectsActivos)) {
+            gameMessageDiv.textContent = `${opponentNameDisplay.textContent} está protegido. ¡El efecto Muerte es bloqueado!`;
+            return;
+        }
 
-    if (rivalHand.length === 0) {
-        gameMessageDiv.textContent = `${opponentNameDisplay.textContent} no tiene cartas para descartar.`;
-        return;
-    }
+        if (rivalHand.length === 0) {
+            gameMessageDiv.textContent = `${opponentNameDisplay.textContent} no tiene cartas para descartar.`;
+            return;
+        }
 
-    gameMessageDiv.textContent = `Elige una de las cartas de ${opponentNameDisplay.textContent} para descartar.`;
+        gameMessageDiv.textContent = `Elige una de las cartas de ${opponentNameDisplay.textContent} para descartar.`;
 
-    // PASO 1: Preparar una ventana emergente (modal) para ti.
-    const facedownSelectionDiv = document.createElement('div');
-    facedownSelectionDiv.classList.add('hand');
-    facedownSelectionDiv.style.justifyContent = 'center';
+        const facedownSelectionDiv = document.createElement('div');
+        facedownSelectionDiv.classList.add('hand');
+        facedownSelectionDiv.style.justifyContent = 'center';
 
-    // PASO 2: Crear una promesa que se resolverá cuando TÚ elijas una carta.
-    const cardSelectionPromise = new Promise(resolve => {
-        // Se crean tantas cartas boca abajo como cartas tenga el rival.
-        rivalHand.forEach(cardId => {
-            const cardElement = createCardElement({}, true); // true = boca abajo
-            cardElement.classList.add('selectable');
-            
-            // Se añade un listener de clic A CADA CARTA BOCA ABAJO.
-            cardElement.addEventListener('click', () => {
-                // Cuando haces clic, se resuelve la promesa con el ID de la carta elegida.
-                resolve(cardId);
-
-                // Se cierra el modal.
-                hideModal(); 
+        const cardSelectionPromise = new Promise(resolve => {
+            rivalHand.forEach(cardId => {
+                const cardElement = createCardElement({}, true);
+                cardElement.classList.add('selectable');
+                
+                cardElement.addEventListener('click', () => {
+                    console.log(`DEBUG: Muerte - ¡Clic detectado! Carta seleccionada (ID): ${cardId}`);
+                    resolve(cardId); // Resuelve la promesa con el ID de la carta
+                    hideModal(); 
+                });
+                facedownSelectionDiv.appendChild(cardElement);
             });
-            facedownSelectionDiv.appendChild(cardElement);
         });
-    });
 
-    // PASO 3: Mostrarte el modal con las cartas boca abajo del rival para que elijas.
-    await displayModal(
-        `Elige la carta a descartar del rival`,
-        facedownSelectionDiv,
-        [] // No hay botones, la elección es directa sobre las cartas.
-    );
+        await displayModal(
+            `Elige la carta a descartar del rival`,
+            facedownSelectionDiv,
+            []
+        );
 
-    // PASO 4: Esperar a que hagas tu elección. La variable contendrá la carta que tú elegiste.
-    const discardedCardIdMuerte = await cardSelectionPromise;
+        console.log("DEBUG: Muerte - Esperando la selección del jugador...");
+        const discardedCardIdMuerte = await cardSelectionPromise;
+        console.log(`DEBUG: Muerte - Promesa resuelta. Carta elegida: ${discardedCardIdMuerte}`);
 
-    // PASO 5: Procesar la carta que TÚ elegiste.
-    if (discardedCardIdMuerte) {
-        // Se elimina la carta de la mano del rival.
-        const index = rivalHand.indexOf(discardedCardIdMuerte);
-        if (index > -1) {
-            rivalHand.splice(index, 1);
-            pilaDescarte.push(discardedCardIdMuerte);
-        }
-
-        const discardedCardDef = cardDefinitions.find(c => c.id === discardedCardIdMuerte);
-        gameMessageDiv.textContent = `Has descartado la carta "${discardedCardDef.name}" del rival.`;
-
-        // Se informa a ambos jugadores de la carta descartada.
-        const modalIdMuerteView = `muerte-view-${Date.now()}`;
-        await roomRef.update({
-            [`estadoJuego.modalConfirmations.${modalIdMuerteView}`]: {
-                [currentUserId]: true,
-                [currentRivalId]: false,
-                type: 'view_card',
-                cardId: discardedCardIdMuerte
+        if (discardedCardIdMuerte) {
+            const index = rivalHand.indexOf(discardedCardIdMuerte);
+            if (index > -1) {
+                rivalHand.splice(index, 1);
+                pilaDescarte.push(discardedCardIdMuerte);
             }
-        });
-        await awaitMultiPlayerModalConfirmation(modalIdMuerteView);
 
-        // Se comprueba el valor para ver si avanzas.
-        if (discardedCardDef.value <= 0) {
-            state.ownPos = Math.min(13, state.ownPos + 1);
-            gameMessageDiv.textContent += ' ¡Como su valor es 0 o menos, avanzas 1 casilla!';
+            const discardedCardDef = cardDefinitions.find(c => c.id === discardedCardIdMuerte);
+            gameMessageDiv.textContent = `Has descartado la carta "${discardedCardDef.name}" del rival.`;
+
+            const modalIdMuerteView = `muerte-view-${Date.now()}`;
+            console.log("DEBUG: Muerte - Actualizando Firestore para mostrar la carta descartada...");
+            await roomRef.update({
+                [`estadoJuego.modalConfirmations.${modalIdMuerteView}`]: {
+                    [currentUserId]: true,
+                    [currentRivalId]: false,
+                    type: 'view_card',
+                    cardId: discardedCardIdMuerte
+                }
+            });
+            console.log("DEBUG: Muerte - Firestore actualizado. Esperando confirmación del otro jugador...");
+
+            await awaitMultiPlayerModalConfirmation(modalIdMuerteView);
+            console.log("DEBUG: Muerte - Confirmación recibida. Aplicando efecto de avance si corresponde.");
+
+            if (discardedCardDef.value <= 0) {
+                state.ownPos = Math.min(13, state.ownPos + 1);
+                gameMessageDiv.textContent += ' ¡Como su valor es 0 o menos, avanzas 1 casilla!';
+            }
+        } else {
+            gameMessageDiv.textContent = 'No se seleccionó ninguna carta para descartar.';
         }
-    } else {
-        gameMessageDiv.textContent = 'No se seleccionó ninguna carta para descartar.';
+        
+    } catch (error) {
+        // Si ocurre cualquier error en el proceso, se mostrará aquí
+        console.error("ERROR GRAVE en effectMuerte:", error);
+        gameMessageDiv.textContent = 'Ocurrió un error con el efecto de la carta. Revisa la consola.';
     }
 }
 
@@ -779,10 +783,14 @@ async function effectDetective(state) {
     }
 }
 
+// Reemplaza la función effectGuardaespaldas con esta versión:
 async function effectGuardaespaldas(state) {
     let { currentUserId, effectsActivos } = state;
     console.log("DEBUG: Efecto Guardaespaldas activado.");
-    state.effectsActivos[currentUserId] = { guardaespaldas: true, turnosRestantes: 1 };
+    
+    // La duración correcta es 2 para que sobreviva un ciclo de turnos completo.
+    state.effectsActivos[currentUserId] = { guardaespaldas: true, turnosRestantes: 2 }; 
+    
     gameMessageDiv.textContent = '¡Guardaespaldas activado! Estás protegido hasta tu próximo turno.';
     console.log("DEBUG: Guardaespaldas: Efecto activado para el jugador actual.");
 }

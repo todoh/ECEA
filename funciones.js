@@ -1,62 +1,81 @@
 
 // Función para pasar el turno
+// En el archivo: funciones.js
+
 async function passTurn() {
-    console.log("--- INICIANDO passTurn ---");
+    console.log("--- INICIANDO passTurn (Versión con Transacción) ---");
     const roomRef = db.collection('SALAS').doc(currentRoomId);
 
-    const currentRoomDoc = await roomRef.get();
-    if (!currentRoomDoc.exists) {
-        console.error("DEBUG: Sala no encontrada al intentar pasar el turno.");
-        return;
+    try {
+        // Iniciar una transacción para una operación segura
+        await db.runTransaction(async (transaction) => {
+            // Leer el documento DENTRO de la transacción para obtener los datos más actuales
+            const currentRoomDoc = await transaction.get(roomRef);
+            
+            if (!currentRoomDoc.exists) {
+                console.error("DEBUG: Sala no encontrada al intentar pasar el turno.");
+                throw new Error("La sala no existe."); // Abortar la transacción si la sala no existe
+            }
+            
+            const currentGameState = currentRoomDoc.data().estadoJuego;
+
+            // --- INICIO DE TU CÓDIGO ORIGINAL (NO SE HA QUITADO NADA) ---
+            if (currentGameState.turnoActual !== currentUserId) {
+                gameMessageDiv.textContent = '¡No es tu turno para pasar!';
+                console.log("passTurn: Bloqueado, no es el turno del jugador.");
+                return; // Detiene la ejecución de ESTA transacción, no se realizará ninguna escritura
+            }
+            console.log(`passTurn: Es el turno de ${currentUserId}. Procediendo.`);
+
+            const nextTurnPlayerId = currentRivalId;
+            let updatePayload = {};
+
+            // --- DEPURACIÓN DEL GUARDAESPALDAS ---
+            console.log("passTurn: Revisando efectos activos...", currentGameState.efectosActivos);
+            const updatedEffects = { ...currentGameState.efectosActivos };
+
+            if (updatedEffects[currentUserId] && updatedEffects[currentUserId].guardaespaldas) {
+                console.log(`passTurn: ¡EFECTO GUARDAESPALDAS ENCONTRADO para ${currentUserId}!`);
+                console.log(`passTurn: Turnos restantes (antes): ${updatedEffects[currentUserId].turnosRestantes}`);
+
+                updatedEffects[currentUserId].turnosRestantes--;
+
+                console.log(`passTurn: Turnos restantes (después): ${updatedEffects[currentUserId].turnosRestantes}`);
+
+                if (updatedEffects[currentUserId].turnosRestantes <= 0) {
+                    console.log("passTurn: Turnos restantes es 0 o menos. ELIMINANDO EFECTO.");
+                    delete updatedEffects[currentUserId];
+                    gameMessageDiv.textContent += ' El efecto Guardaespaldas ha terminado.';
+                } else {
+                    console.log("passTurn: El efecto todavía tiene turnos restantes.");
+                }
+            } else {
+                console.log(`passTurn: No se encontró efecto Guardaespaldas para el jugador actual (${currentUserId}).`);
+            }
+
+            const newDrawStatus = { ...currentGameState.drawStatus };
+            newDrawStatus[nextTurnPlayerId] = false;
+
+            updatePayload = {
+                'estadoJuego.turnoActual': nextTurnPlayerId,
+                'estadoJuego.efectosActivos': updatedEffects, // Se enviarán los efectos actualizados
+                'estadoJuego.drawStatus': newDrawStatus
+            };
+            
+            console.log("passTurn: Payload final que se enviará a Firestore:", updatePayload);
+            
+            // Usar transaction.update en lugar de roomRef.update
+            transaction.update(roomRef, updatePayload);
+            
+            // --- FIN DE TU CÓDIGO ORIGINAL ---
+        });
+
+        console.log("--- FIN passTurn (Transacción completada exitosamente) ---");
+
+    } catch (error) {
+        console.error("Error en la transacción de passTurn:", error);
+        gameMessageDiv.textContent = "Hubo un error al pasar el turno. Inténtalo de nuevo.";
     }
-    const currentGameState = currentRoomDoc.data().estadoJuego;
-
-    if (currentGameState.turnoActual !== currentUserId) {
-        gameMessageDiv.textContent = '¡No es tu turno para pasar!';
-        console.log("passTurn: Bloqueado, no es el turno del jugador.");
-        return;
-    }
-    console.log(`passTurn: Es el turno de ${currentUserId}. Procediendo.`);
-
-    const nextTurnPlayerId = currentRivalId;
-    let updatePayload = {};
-
-    // --- DEPURACIÓN DEL GUARDAESPALDAS ---
-    console.log("passTurn: Revisando efectos activos...", currentGameState.efectosActivos);
-    const updatedEffects = { ...currentGameState.efectosActivos };
-
-    // Comprobamos si el jugador que está pasando el turno (currentUserId) tiene el efecto.
-    if (updatedEffects[currentUserId] && updatedEffects[currentUserId].guardaespaldas) {
-        console.log(`passTurn: ¡EFECTO GUARDAESPALDAS ENCONTRADO para ${currentUserId}!`);
-        console.log(`passTurn: Turnos restantes (antes): ${updatedEffects[currentUserId].turnosRestantes}`);
-
-        updatedEffects[currentUserId].turnosRestantes--;
-
-        console.log(`passTurn: Turnos restantes (después): ${updatedEffects[currentUserId].turnosRestantes}`);
-
-        if (updatedEffects[currentUserId].turnosRestantes <= 0) {
-            console.log("passTurn: Turnos restantes es 0 o menos. ELIMINANDO EFECTO.");
-            delete updatedEffects[currentUserId];
-            gameMessageDiv.textContent += ' El efecto Guardaespaldas ha terminado.';
-        } else {
-            console.log("passTurn: El efecto todavía tiene turnos restantes.");
-        }
-    } else {
-        console.log(`passTurn: No se encontró efecto Guardaespaldas para el jugador actual (${currentUserId}).`);
-    }
-
-    const newDrawStatus = { ...currentGameState.drawStatus };
-    newDrawStatus[nextTurnPlayerId] = false;
-
-    updatePayload = {
-        'estadoJuego.turnoActual': nextTurnPlayerId,
-        'estadoJuego.efectosActivos': updatedEffects, // Se enviarán los efectos actualizados
-        'estadoJuego.drawStatus': newDrawStatus
-    };
-    
-    console.log("passTurn: Payload final que se enviará a Firestore:", updatePayload);
-    await roomRef.update(updatePayload);
-    console.log("--- FIN passTurn ---");
 }
 
 // Función para reiniciar el estado del juego
