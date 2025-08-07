@@ -363,29 +363,27 @@ async function effectLoco(state) {
 }
 
 async function effectVagabundo(state) {
-    let { ownHand, ownPos, rivalHand, currentUserId, currentRivalId, roomData, roomRef, pilaDescarte } = state; 
+    let { ownHand, ownPos, rivalHand, currentUserId, currentRivalId, roomData, roomRef, pilaDescarte } = state;
     const isPlayer1 = roomData.jugador1Id === currentUserId;
     console.log("DEBUG: Efecto Vagabundo activado.");
 
     const targetPlayerIdVagabundo = await choosePlayer();
-    
-    // Use the current state hands directly, do not re-fetch
-    if (ownHand.length === 0 || rivalHand.length === 0) { 
+
+    if (ownHand.length === 0 || rivalHand.length === 0) {
         gameMessageDiv.textContent = 'Uno de los jugadores no tiene cartas para el efecto Vagabundo.';
         console.log("DEBUG: Vagabundo: Jugador sin cartas.");
         return;
     }
 
-    // Determine lowest cards for modal display from current hands
     const ownLowestCardInitial = ownHand.reduce((minCard, cardId) => {
         const card = cardDefinitions.find(c => c.id === cardId);
         return (!minCard || (card && card.value < minCard.value)) ? card : minCard;
-    }, {value: Infinity});
+    }, { value: Infinity });
 
     const rivalLowestCardInitial = rivalHand.reduce((minCard, cardId) => {
         const card = cardDefinitions.find(c => c.id === cardId);
         return (!minCard || (card && card.value < minCard.value)) ? card : minCard;
-    }, {value: Infinity});
+    }, { value: Infinity });
 
     if (ownLowestCardInitial.value !== Infinity && rivalLowestCardInitial.value !== Infinity) {
         const modalIdVagabundo = `vagabundo-${Date.now()}-${currentUserId}`;
@@ -432,18 +430,15 @@ async function effectVagabundo(state) {
 
         await awaitMultiPlayerModalConfirmation(modalIdVagabundo);
 
-        // No re-fetch here. Operate on the 'state' object directly.
-        
-        // Re-calculate lowest cards from current hands (they haven't changed from Firestore yet)
         const freshOwnLowestCard = ownHand.reduce((minCard, cardId) => {
             const card = cardDefinitions.find(c => c.id === cardId);
             return (!minCard || (card && card.value < minCard.value)) ? card : minCard;
-        }, {value: Infinity});
+        }, { value: Infinity });
 
         const freshRivalLowestCard = rivalHand.reduce((minCard, cardId) => {
             const card = cardDefinitions.find(c => c.id === cardId);
             return (!minCard || (card && card.value < minCard.value)) ? card : minCard;
-        }, {value: Infinity});
+        }, { value: Infinity });
 
         gameMessageDiv.textContent = `Comparando cartas más bajas: Tú ${freshOwnLowestCard.name}, Rival ${freshRivalLowestCard.name}.`;
         console.log("DEBUG: Vagabundo: Cartas más bajas (post-modal) - Propia:", freshOwnLowestCard.name, "Rival:", freshRivalLowestCard.name);
@@ -455,20 +450,6 @@ async function effectVagabundo(state) {
         } else {
             gameMessageDiv.textContent += ` Tu carta más baja (${freshOwnLowestCard.name}) no es menor que la del rival.`;
             console.log("DEBUG: Vagabundo: No avanza.");
-        }
-
-        // Discard both compared cards
-        const indexOwnLowest = ownHand.indexOf(freshOwnLowestCard.id);
-        if (indexOwnLowest > -1) {
-            ownHand.splice(indexOwnLowest, 1);
-            pilaDescarte.push(freshOwnLowestCard.id);
-            console.log(`DEBUG: Vagabundo: Descartada carta propia: ${freshOwnLowestCard.name}`);
-        }
-        const indexRivalLowest = rivalHand.indexOf(freshRivalLowestCard.id);
-        if (indexRivalLowest > -1) {
-            rivalHand.splice(indexRivalLowest, 1);
-            pilaDescarte.push(freshRivalLowestCard.id);
-            console.log(`DEBUG: Vagabundo: Descartada carta rival: ${freshRivalLowestCard.name}`);
         }
 
     } else {
