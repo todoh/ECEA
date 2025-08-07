@@ -46,53 +46,53 @@ async function effectMuerte(state) {
 
     if (isEffectBlockedByGuardaespaldas(currentRivalId, effectsActivos)) {
         gameMessageDiv.textContent = `${opponentNameDisplay.textContent} está protegido por Guardaespaldas. ¡El efecto Muerte es bloqueado!`;
-        console.log("DEBUG: Muerte: Efecto bloqueado por Guardaespaldas.");
         return;
     }
 
     if (rivalHand.length === 0) {
         gameMessageDiv.textContent = `${opponentNameDisplay.textContent} no tiene cartas para descartar.`;
-        console.log("DEBUG: Muerte: Rival sin cartas.");
         return;
     }
 
-    // --- LÓGICA CORREGIDA ---
-    // El atacante elige la carta del rival para descartar.
+    gameMessageDiv.textContent = `Elige una de las cartas de ${opponentNameDisplay.textContent} para descartar.`;
 
-    gameMessageDiv.textContent = `Elige una de las cartas de ${opponentNameDisplay.textContent} para descartar (boca abajo).`;
-
-    // 1. Crear un modal para que el atacante elija una carta boca abajo.
+    // PASO 1: Preparar una ventana emergente (modal) para ti.
     const facedownSelectionDiv = document.createElement('div');
     facedownSelectionDiv.classList.add('hand');
     facedownSelectionDiv.style.justifyContent = 'center';
 
-    let chosenCardId = null;
-
+    // PASO 2: Crear una promesa que se resolverá cuando TÚ elijas una carta.
     const cardSelectionPromise = new Promise(resolve => {
+        // Se crean tantas cartas boca abajo como cartas tenga el rival.
         rivalHand.forEach(cardId => {
-            const cardElement = createCardElement({}, true); // Crear carta boca abajo
+            const cardElement = createCardElement({}, true); // true = boca abajo
             cardElement.classList.add('selectable');
+            
+            // Se añade un listener de clic A CADA CARTA BOCA ABAJO.
             cardElement.addEventListener('click', () => {
-                chosenCardId = cardId;
+                // Cuando haces clic, se resuelve la promesa con el ID de la carta elegida.
                 resolve(cardId);
-                hideModal();
+
+                // Se cierra el modal.
+                hideModal(); 
             });
             facedownSelectionDiv.appendChild(cardElement);
         });
     });
 
+    // PASO 3: Mostrarte el modal con las cartas boca abajo del rival para que elijas.
     await displayModal(
         `Elige la carta a descartar del rival`,
         facedownSelectionDiv,
-        [], // Sin botones, la selección se hace en las cartas
-        'discard-modal-content'
+        [] // No hay botones, la elección es directa sobre las cartas.
     );
 
+    // PASO 4: Esperar a que hagas tu elección. La variable contendrá la carta que tú elegiste.
     const discardedCardIdMuerte = await cardSelectionPromise;
 
-    // 2. Procesar la carta elegida
+    // PASO 5: Procesar la carta que TÚ elegiste.
     if (discardedCardIdMuerte) {
-        // Eliminar carta de la mano del rival y añadirla al descarte
+        // Se elimina la carta de la mano del rival.
         const index = rivalHand.indexOf(discardedCardIdMuerte);
         if (index > -1) {
             rivalHand.splice(index, 1);
@@ -101,9 +101,8 @@ async function effectMuerte(state) {
 
         const discardedCardDef = cardDefinitions.find(c => c.id === discardedCardIdMuerte);
         gameMessageDiv.textContent = `Has descartado la carta "${discardedCardDef.name}" del rival.`;
-        console.log("DEBUG: Muerte: Carta descartada del rival:", discardedCardDef.name);
 
-        // 3. Mostrar a ambos jugadores qué carta fue descartada (opcional pero recomendado)
+        // Se informa a ambos jugadores de la carta descartada.
         const modalIdMuerteView = `muerte-view-${Date.now()}`;
         await roomRef.update({
             [`estadoJuego.modalConfirmations.${modalIdMuerteView}`]: {
@@ -115,16 +114,13 @@ async function effectMuerte(state) {
         });
         await awaitMultiPlayerModalConfirmation(modalIdMuerteView);
 
-
-        // 4. Aplicar el efecto de avance si corresponde
+        // Se comprueba el valor para ver si avanzas.
         if (discardedCardDef.value <= 0) {
             state.ownPos = Math.min(13, state.ownPos + 1);
             gameMessageDiv.textContent += ' ¡Como su valor es 0 o menos, avanzas 1 casilla!';
-            console.log("DEBUG: Muerte: Avanza 1 casilla. Nueva posición:", state.ownPos);
         }
     } else {
         gameMessageDiv.textContent = 'No se seleccionó ninguna carta para descartar.';
-        console.log("DEBUG: Muerte: No se seleccionó carta.");
     }
 }
 
