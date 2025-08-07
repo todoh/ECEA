@@ -689,7 +689,7 @@
 
             // Si la carta jugada es Semidiós, el jugador actual repite turno.
             // El efecto de Perro se maneja en passTurn, no aquí.
-            if (playedCard.id === 'semidios') {
+            if  (playedCard.id === 'semidios' || playedCard.id === 'perro') {
                 nextTurnPlayerId = currentUserId; // Repetir turno
                 newDrawStatus[currentUserId] = false; // Reset draw status for repeated turn
                 gameMessageDiv.textContent += ' ¡Repites tu turno!';

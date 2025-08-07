@@ -41,7 +41,7 @@ const isEffectBlockedByGuardaespaldas = (targetPlayerId, effectsActivos) => {
 // --- Funciones de efecto individuales para cada carta ---
 
 async function effectMuerte(state) {
-    let { ownHand, rivalHand, ownPos, rivalPos, mazo, pilaDescarte, currentUserId, currentRivalId, roomData, roomRef, effectsActivos } = state;
+    let { ownPos, rivalHand, pilaDescarte, currentUserId, currentRivalId, roomData, roomRef, effectsActivos } = state;
     console.log("DEBUG: Efecto Muerte activado.");
 
     if (isEffectBlockedByGuardaespaldas(currentRivalId, effectsActivos)) {
@@ -56,49 +56,75 @@ async function effectMuerte(state) {
         return;
     }
 
-    const modalIdMuerte = `muerte-${Date.now()}-${currentUserId}`;
+    // --- LÓGICA CORREGIDA ---
+    // El atacante elige la carta del rival para descartar.
 
-    await roomRef.update({
-        [`estadoJuego.modalConfirmations.${modalIdMuerte}`]: {
-            [currentUserId]: true,
-            [currentRivalId]: false,
-            type: 'choose_card_to_discard_facedown',
-            targetPlayerId: currentRivalId,
-            initiatorId: currentUserId,
-            numToDiscard: 1,
-            chosenCardId: null
-        }
+    gameMessageDiv.textContent = `Elige una de las cartas de ${opponentNameDisplay.textContent} para descartar (boca abajo).`;
+
+    // 1. Crear un modal para que el atacante elija una carta boca abajo.
+    const facedownSelectionDiv = document.createElement('div');
+    facedownSelectionDiv.classList.add('hand');
+    facedownSelectionDiv.style.justifyContent = 'center';
+
+    let chosenCardId = null;
+
+    const cardSelectionPromise = new Promise(resolve => {
+        rivalHand.forEach(cardId => {
+            const cardElement = createCardElement({}, true); // Crear carta boca abajo
+            cardElement.classList.add('selectable');
+            cardElement.addEventListener('click', () => {
+                chosenCardId = cardId;
+                resolve(cardId);
+                hideModal();
+            });
+            facedownSelectionDiv.appendChild(cardElement);
+        });
     });
 
-    gameMessageDiv.textContent = `Esperando a que ${opponentNameDisplay.textContent} descarte una carta por Muerte.`;
-    console.log("DEBUG: Muerte: Esperando selección del rival.");
+    await displayModal(
+        `Elige la carta a descartar del rival`,
+        facedownSelectionDiv,
+        [], // Sin botones, la selección se hace en las cartas
+        'discard-modal-content'
+    );
 
-    await awaitMultiPlayerModalConfirmation(modalIdMuerte);
+    const discardedCardIdMuerte = await cardSelectionPromise;
 
-    // Re-fetch room data after opponent's modal interaction to get updated hands and discard pile
-    const updatedRoomDocMuerte = await roomRef.get();
-    const updatedRoomDataMuerte = updatedRoomDocMuerte.data();
-    state.ownHand = roomData.jugador1Id === currentUserId ? [...updatedRoomDataMuerte.estadoJuego.manoJugador1] : [...updatedRoomDataMuerte.estadoJuego.manoJugador2];
-    state.rivalHand = roomData.jugador1Id === currentUserId ? [...updatedRoomDataMuerte.estadoJuego.manoJugador2] : [...updatedRoomDataMuerte.estadoJuego.manoJugador1];
-    state.mazo = [...updatedRoomDataMuerte.estadoJuego.mazo];
-    state.pilaDescarte = [...updatedRoomDataMuerte.estadoJuego.pilaDescarte];
-
-    const muerteModalState = updatedRoomDataMuerte.estadoJuego.modalConfirmations[modalIdMuerte];
-    const discardedCardIdMuerte = muerteModalState ? muerteModalState.chosenCardId : null;
-
+    // 2. Procesar la carta elegida
     if (discardedCardIdMuerte) {
-        const discardedCardMuerteDef = cardDefinitions.find(c => c.id === discardedCardIdMuerte);
-        gameMessageDiv.textContent = `${opponentNameDisplay.textContent} ha descartado ${discardedCardMuerteDef.name}.`;
-        console.log("DEBUG: Muerte: Carta descartada del rival:", discardedCardMuerteDef.name);
+        // Eliminar carta de la mano del rival y añadirla al descarte
+        const index = rivalHand.indexOf(discardedCardIdMuerte);
+        if (index > -1) {
+            rivalHand.splice(index, 1);
+            pilaDescarte.push(discardedCardIdMuerte);
+        }
 
-        if (discardedCardMuerteDef.value <= 0) {
-            state.ownPos = Math.min(13, ownPos + 1);
-            gameMessageDiv.textContent += ' ¡Has avanzado 1 casilla!';
+        const discardedCardDef = cardDefinitions.find(c => c.id === discardedCardIdMuerte);
+        gameMessageDiv.textContent = `Has descartado la carta "${discardedCardDef.name}" del rival.`;
+        console.log("DEBUG: Muerte: Carta descartada del rival:", discardedCardDef.name);
+
+        // 3. Mostrar a ambos jugadores qué carta fue descartada (opcional pero recomendado)
+        const modalIdMuerteView = `muerte-view-${Date.now()}`;
+        await roomRef.update({
+            [`estadoJuego.modalConfirmations.${modalIdMuerteView}`]: {
+                [currentUserId]: true,
+                [currentRivalId]: false,
+                type: 'view_card',
+                cardId: discardedCardIdMuerte
+            }
+        });
+        await awaitMultiPlayerModalConfirmation(modalIdMuerteView);
+
+
+        // 4. Aplicar el efecto de avance si corresponde
+        if (discardedCardDef.value <= 0) {
+            state.ownPos = Math.min(13, state.ownPos + 1);
+            gameMessageDiv.textContent += ' ¡Como su valor es 0 o menos, avanzas 1 casilla!';
             console.log("DEBUG: Muerte: Avanza 1 casilla. Nueva posición:", state.ownPos);
         }
     } else {
-        gameMessageDiv.textContent = 'El rival no seleccionó ninguna carta para descartar.';
-        console.log("DEBUG: Muerte: Rival no seleccionó carta.");
+        gameMessageDiv.textContent = 'No se seleccionó ninguna carta para descartar.';
+        console.log("DEBUG: Muerte: No se seleccionó carta.");
     }
 }
 
@@ -192,8 +218,7 @@ async function effectRanaDeLaSuerte(state) {
 }
 
 async function effectPerro(state) {
-    console.log("DEBUG: Efecto Perro activado.");
-    state.repeatTurn = true; // Establece la bandera para que `passTurn` la detecte
+    
     gameMessageDiv.textContent += ` ¡Repites tu turno!`;
     console.log("DEBUG: Perro: El jugador actual repetirá turno.");
 }
@@ -251,114 +276,96 @@ async function effectEsclavo(state) {
 }
 
 async function effectLoco(state) {
-    let { ownHand, rivalHand, ownPos, rivalPos, mazo, pilaDescarte, currentUserId, currentRivalId, roomData, roomRef, effectsActivos } = state;
-    const isPlayer1 = roomData.jugador1Id === currentUserId;
+    let { ownHand, rivalHand, ownPos, rivalPos, pilaDescarte, currentUserId, currentRivalId, roomData, roomRef, effectsActivos } = state;
     console.log("DEBUG: Efecto Loco activado.");
 
-    const targetPlayerIdLoco = await choosePlayer();
-    // targetHandLoco will be determined from the state object passed in, not re-fetched
-    let targetHandLoco = (isPlayer1 && targetPlayerIdLoco === currentRivalId) ? rivalHand : ownHand;
-
-
-    if (isEffectBlockedByGuardaespaldas(targetPlayerIdLoco, effectsActivos)) {
+    if (isEffectBlockedByGuardaespaldas(currentRivalId, effectsActivos)) {
         gameMessageDiv.textContent = `${opponentNameDisplay.textContent} está protegido por Guardaespaldas. ¡El efecto Loco es bloqueado!`;
-        console.log("DEBUG: Loco: Efecto bloqueado por Guardaespaldas.");
         return;
     }
 
-    if (ownHand.length === 0 || targetHandLoco.length === 0) {
-        gameMessageDiv.textContent = 'Uno de los jugadores no tiene cartas para el efecto Loco.';
-        console.log("DEBUG: Loco: Jugador sin cartas.");
+    if (ownHand.length === 0 || rivalHand.length === 0) {
+        gameMessageDiv.textContent = 'Uno de los jugadores no tiene cartas para el duelo del Loco.';
         return;
     }
 
-    // Determine cards for comparison from the current state hands
-    const ownCardLocoId = ownHand[0]; 
-    const rivalCardLocoId = targetHandLoco[0]; 
+    // --- LÓGICA CORREGIDA ---
+    // Ambos jugadores eligen su carta para el duelo.
 
+    // 1. El atacante (jugador actual) elige su carta.
+    const ownCardsToChoose = await chooseCardsToDiscard(ownHand, 1, "Elige tu carta para el duelo del Loco");
+    if (!ownCardsToChoose || ownCardsToChoose.length === 0) {
+        gameMessageDiv.textContent = "No elegiste una carta para el duelo.";
+        return;
+    }
+    const ownCardLocoId = ownCardsToChoose[0];
     const ownCardLoco = cardDefinitions.find(c => c.id === ownCardLocoId);
+
+
+    // 2. Se informa al rival para que elija su carta.
+    const modalIdLoco = `loco-${Date.now()}-${currentUserId}`;
+    await roomRef.update({
+        [`estadoJuego.modalConfirmations.${modalIdLoco}`]: {
+            [currentUserId]: true,
+            [currentRivalId]: false,
+            type: 'choose_card_to_discard', // Reutilizamos este tipo de modal
+            targetPlayerId: currentRivalId,
+            initiatorId: currentUserId,
+            numToDiscard: 1,
+            chosenCardId: null
+        }
+    });
+
+    gameMessageDiv.textContent = `Has elegido ${ownCardLoco.name}. Esperando a que ${opponentNameDisplay.textContent} elija su carta...`;
+
+    // 3. Esperar a que el rival confirme su elección.
+    await awaitMultiPlayerModalConfirmation(modalIdLoco);
+
+    // 4. Obtener la elección del rival desde el estado actualizado de la sala.
+    const updatedRoomDoc = await roomRef.get();
+    const updatedGameState = updatedRoomDoc.data().estadoJuego;
+    const rivalCardLocoId = updatedGameState.modalConfirmations[modalIdLoco]?.chosenCardId;
+
+    if (!rivalCardLocoId) {
+        gameMessageDiv.textContent = "El rival no eligió una carta. El efecto se cancela.";
+        // Devolver la carta elegida a la mano del jugador
+        return;
+    }
     const rivalCardLoco = cardDefinitions.find(c => c.id === rivalCardLocoId);
 
-    if (ownCardLoco && rivalCardLoco) {
-        const modalIdLoco = `loco-${Date.now()}-${currentUserId}`;
-
-        await roomRef.update({
-            [`estadoJuego.modalConfirmations.${modalIdLoco}`]: {
-                [currentUserId]: true,
-                [currentRivalId]: false,
-                type: 'comparison',
-                player1Card: ownCardLocoId,
-                player2Card: rivalCardLocoId,
-                player1Id: currentUserId,
-                player2Id: currentRivalId
-            }
-        });
-
-        const comparisonCardsDivLoco = document.createElement('div');
-        comparisonCardsDivLoco.classList.add('hand');
-        comparisonCardsDivLoco.style.justifyContent = 'space-around';
-        comparisonCardsDivLoco.style.width = '100%';
-        comparisonCardsDivLoco.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span>Tu Carta:</span>
-                ${createCardElement(ownCardLoco).outerHTML}
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span>Carta del Rival:</span>
-                ${createCardElement(rivalCardLoco).outerHTML}
-            </div>
-        `;
-
-        const actionLoco = await displayModal(
-            'Comparación de Cartas (Loco)',
-            comparisonCardsDivLoco,
-            [{ text: 'Aceptar', action: 'confirm_modal_view' }],
-            'comparison-modal'
-        );
-
-        if (actionLoco === 'confirm_modal_view') {
-            await roomRef.update({
-                [`estadoJuego.modalConfirmations.${modalIdLoco}.${currentUserId}`]: true
-            });
+    // 5. Mostrar a ambos el resultado de la comparación.
+    const modalIdLocoView = `loco-view-${Date.now()}`;
+    await roomRef.update({
+        [`estadoJuego.modalConfirmations.${modalIdLocoView}`]: {
+            [currentUserId]: true, [currentRivalId]: false, type: 'comparison',
+            player1Card: ownCardLocoId, player2Card: rivalCardLocoId,
+            player1Id: currentUserId, player2Id: currentRivalId
         }
+    });
+    await awaitMultiPlayerModalConfirmation(modalIdLocoView);
+    
+    // 6. Descartar las cartas elegidas de las manos de ambos jugadores.
+    let indexOwn = ownHand.indexOf(ownCardLocoId);
+    if (indexOwn > -1) ownHand.splice(indexOwn, 1);
+    
+    let indexRival = rivalHand.indexOf(rivalCardLocoId);
+    if (indexRival > -1) rivalHand.splice(indexRival, 1);
+    
+    pilaDescarte.push(ownCardLocoId, rivalCardLocoId);
+    console.log(`DEBUG: Loco: Descartadas: ${ownCardLoco.name} y ${rivalCardLoco.name}`);
 
-        await awaitMultiPlayerModalConfirmation(modalIdLoco);
-
-        // No re-fetch here. Operate on the 'state' object directly.
-
-        // Discard the compared cards from the hands
-        const indexOwnLoco = ownHand.indexOf(ownCardLocoId);
-        if (indexOwnLoco > -1) {
-            ownHand.splice(indexOwnLoco, 1);
-            pilaDescarte.push(ownCardLocoId);
-            console.log(`DEBUG: Loco: Descartada carta propia: ${ownCardLoco.name}`);
-        }
-        const indexRivalLoco = targetHandLoco.indexOf(rivalCardLocoId); 
-        if (indexRivalLoco > -1) {
-            targetHandLoco.splice(indexRivalLoco, 1); 
-            pilaDescarte.push(rivalCardLocoId);
-            console.log(`DEBUG: Loco: Descartada carta rival: ${rivalCardLoco.name}`);
-        }
-
-        gameMessageDiv.textContent = `Ambos mostráis: Tú ${ownCardLoco.name}, Rival ${rivalCardLoco.name}.`;
-        console.log("DEBUG: Loco: Cartas descartadas:", ownCardLoco.name, rivalCardLoco.name);
-
-        if (ownCardLoco.value > rivalCardLoco.value) {
-            state.ownPos = Math.min(13, ownPos + 2);
-            state.rivalPos = Math.max(0, rivalPos - 1);
-            gameMessageDiv.textContent += ` ¡Has ganado la comparación con Loco! Avanzas 2, el rival retrocede 1.`;
-            console.log("DEBUG: Loco: Gana propio. Posiciones:", state.ownPos, state.rivalPos);
-        } else if (rivalCardLoco.value > ownCardLoco.value) {
-            state.ownPos = Math.max(0, ownPos - 1);
-            state.rivalPos = Math.min(13, rivalPos + 2);
-            gameMessageDiv.textContent += ` ¡El rival ha ganado la comparación con Loco! Tú retrocedes 1, el rival avanza 2.`;
-            console.log("DEBUG: Loco: Gana rival. Posiciones:", state.ownPos, state.rivalPos);
-        } else {
-            gameMessageDiv.textContent += ` Empate en la comparación de Loco. Nadie avanza ni retrocede.`;
-            console.log("DEBUG: Loco: Empate.");
-        }
-        // Ensure state's hands are updated if targetHandLoco was rivalHand
-        if (isPlayer1 && targetPlayerIdLoco === currentRivalId) { state.rivalHand = targetHandLoco; } else if (targetPlayerIdLoco === currentUserId) { state.ownHand = targetHandLoco; }
+    // 7. Aplicar efectos de avance/retroceso.
+    gameMessageDiv.textContent = `Duelo del Loco: Tú (${ownCardLoco.name}) vs. Rival (${rivalCardLoco.name}).`;
+    if (ownCardLoco.value > rivalCardLoco.value) {
+        state.ownPos = Math.min(13, ownPos + 2);
+        state.rivalPos = Math.max(0, rivalPos - 1);
+        gameMessageDiv.textContent += ` ¡Ganas! Avanzas 2, el rival retrocede 1.`;
+    } else if (rivalCardLoco.value > ownCardLoco.value) {
+        state.ownPos = Math.max(0, ownPos - 1);
+        state.rivalPos = Math.min(13, rivalPos + 2);
+        gameMessageDiv.textContent += ` ¡Pierdes! Retrocedes 1, el rival avanza 2.`;
+    } else {
+        gameMessageDiv.textContent += ` Empate. Nadie se mueve.`;
     }
 }
 
